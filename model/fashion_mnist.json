@@ -14,8 +14,8 @@
       "activation": "relu"
     },
     "weights": [
-      "dense_w",
-      "dense_b"
+      "dense_0",
+      "dense_1"
     ]
   },
   {
@@ -25,8 +25,8 @@
       "activation": "softmax"
     },
     "weights": [
-      "dense_1_w",
-      "dense_1_b"
+      "dense_1_0",
+      "dense_1_1"
     ]
   }
 ]

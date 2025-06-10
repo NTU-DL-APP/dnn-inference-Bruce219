@@ -6,8 +6,10 @@ def relu(x):
     return np.maximum(0, x)
 
 def softmax(x):
-    e_x = np.exp(x - np.max(x))
-    return e_x / np.sum(e_x)
+    # 支援 batch 輸入：x shape = (batch_size, num_classes)
+    x_max = np.max(x, axis=1, keepdims=True)  # 防 overflow
+    e_x = np.exp(x - x_max)
+    return e_x / np.sum(e_x, axis=1, keepdims=True)
 
 
 

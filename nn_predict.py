@@ -1,31 +1,57 @@
-import numpy as np
+import sys
 import json
+import numpy as np
+from pathlib import Path
+
+# === 模型檔案路徑（可由命令列參數覆寫） ===
+if len(sys.argv) >= 3:
+    MODEL_WEIGHTS_PATH = sys.argv[1]
+    MODEL_ARCH_PATH    = sys.argv[2]
+else:                                       # 預設檔名可自行更改
+    MODEL_WEIGHTS_PATH = "fashion_mnist.npz"
+    MODEL_ARCH_PATH    = "fashion_mnist.json"
+
+# === 載入權重與架構 ===
+weights = np.load(MODEL_WEIGHTS_PATH)
+with open(MODEL_ARCH_PATH, "r") as f:
+    architecture = json.load(f)
 
 # === Activation functions ===
 def relu(x):
     return np.maximum(0, x)
 
 def softmax(x):
-    e_x = np.exp(x - np.max(x, axis=-1, keepdims=True))  # 數值穩定性處理
-    return e_x / np.sum(e_x, axis=-1, keepdims=True)
+    e = np.exp(x - np.max(x, axis=-1, keepdims=True))
+    return e / np.sum(e, axis=-1, keepdims=True)
 
-# === Flatten ===
+# 對照表方便擴充
+_ACT_FUNCS = {
+    "relu": relu,
+    "softmax": softmax,
+}
+
+def apply_activation(x, act_name):
+    """依名稱套用 activation；若 None 則直接回傳 x。"""
+    if act_name is None:
+        return x
+    if act_name not in _ACT_FUNCS:
+        raise ValueError(f"Unsupported activation: {act_name}")
+    return _ACT_FUNCS[act_name](x)
+
+# === 基本層 ===
 def flatten(x):
     return x.reshape(x.shape[0], -1)
 
-# === Dense layer ===
 def dense(x, W, b):
     return x @ W + b
 
-# === Model Forward ===
-# 支援層類型：Dense、Flatten、Activation（relu, softmax）
-def nn_forward_h5(model_arch, weights, data):
-    x = data
-    for layer in model_arch:
-        lname = layer['name']
-        ltype = layer['type']
-        cfg = layer['config']
-        wnames = layer['weights']
+# === Forward pass ===
+def forward(x):
+    """x 需為 NumPy array，shape = (batch, ...)"""
+    for layer in architecture:
+        ltype  = layer["type"]
+        cfg    = layer.get("config", {})
+        wnames = layer.get("weights", [])
 
         if ltype == "Flatten":
             x = flatten(x)
@@ -34,10 +60,21 @@ def nn_forward_h5(model_arch, weights, data):
             W = weights[wnames[0]]
             b = weights[wnames[1]]
             x = dense(x, W, b)
-            
-            if cfg.get("activation") == "relu":
-                x = relu(x)
-            elif cfg.get("activation") == "softmax":
-                x = softmax(x)
+            x = apply_activation(x, cfg.get("activation"))
+
+        elif ltype == "Activation":
+            x = apply_activation(x, cfg.get("activation"))
+
+        else:
+            raise ValueError(f"Unsupported layer type: {ltype}")
 
     return x
+
+# === Example usage ===
+if __name__ == "__main__":
+    # 這裡示範一筆隨機輸入 (28×28 灰階圖片，先 flatten 成 784 維向量)
+    dummy_input = np.random.rand(1, 28 * 28).astype(np.float32)
+    probs = forward(dummy_input)
+
+    print("🧠 Output probabilities:", probs)
+    print("✅ Predicted class:", np.argmax(probs, axis=-1))
